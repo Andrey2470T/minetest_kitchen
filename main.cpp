@@ -16,12 +16,12 @@ s32 blend_mat;
 s32 shadow_mat;
 s32 rays_mat;
 s32 depth_sort_mat;
-s32 depth_write_mat;
+//s32 depth_write_mat;
 io::path project_path = "/home/andrey/minetest_kitchen";
 core::dimension2du wnd_size(1024, 680);
 f32 far_plane = 30.0f;
 bool move_light = false;
-s16 current_rendered_light = -1;
+s32 current_rendered_light = -1;
 
 class PointLight;
 
@@ -65,6 +65,10 @@ public:
 
         pl->shadow = pl->vdrv->addRenderTargetTextureCubemap(1024, "ShadowRT", video::ECF_A32B32G32R32F);
         pl->shadow_depth = pl->vdrv->addRenderTargetTexture(core::dimension2du(1024, 1024), "ShadowDepthRT", video::ECF_D32);
+
+        string rt_tex_name = "RaysRT" + to_string(lights.size()+1);
+
+        pl->rays = pl->vdrv->addRenderTargetTexture(wnd_size, rt_tex_name.c_str(), video::ECF_A32B32G32R32F);
 
         pl->is_position_changed = true;
 
@@ -122,6 +126,10 @@ public:
     {
         return shadow;
     }
+    video::ITexture* getRaysTexture() const
+    {
+        return rays;
+    }
     void setShadowCamera() const
     {
         smgr->setActiveCamera(cam);
@@ -147,6 +155,7 @@ private:
 
     video::ITexture* shadow;
     video::ITexture* shadow_depth;
+    video::ITexture* rays;
 };
 
 class ScreenQuad {
@@ -182,6 +191,7 @@ public:
             1.0f,0.0f);
 
         mat.Lighting = false;
+        //mat.BlendOperation = video::EBO_ADD;
         mat.MaterialType = (video::E_MATERIAL_TYPE)blend_mat;
         mat.BackfaceCulling = false;
         mat.setFlag(video::EMF_BILINEAR_FILTER, false);
@@ -320,7 +330,7 @@ public:
         video::IVideoDriver* vdrv = device->getVideoDriver();
 
         if ((s32)mat->MaterialType == lighting_mat || (s32)mat->MaterialType == shadow_mat ||
-                (s32)mat->MaterialType == rays_mat || (s32)mat->MaterialType == depth_sort_mat || (s32)mat->MaterialType == depth_write_mat)
+                (s32)mat->MaterialType == rays_mat || (s32)mat->MaterialType == depth_sort_mat)
         {
             core::matrix4 model = vdrv->getTransform(video::ETS_WORLD);
             scene::ISceneManager* smgr = device->getSceneManager();
@@ -412,14 +422,24 @@ public:
             s32 tex2 = 1;
 
             services->setPixelShaderConstant("mBaseTex", &tex1, 1);
-            services->setPixelShaderConstant("mBlurTex", &tex2, 1);
+
+            for (u16 i =0; i<MAX_LIGHTS_COUNT;i++)
+            {
+                s32 raystex_id = i+1;
+                string c_name = "mRaysTex";
+                c_name += to_string(raystex_id);
+                services->setPixelShaderConstant(c_name.c_str(), &raystex_id, 1);
+            }
         }
         else if ((s32)mat->MaterialType == rays_mat)
         {
-            s32 tex = 0;
+            s32 lights_tex = 0;
+            s32 lights_ids_tex = 1;
 
-            services->setPixelShaderConstant("mTex", &tex, 1);
-            auto pos = lights[0]->getPosition();
+            services->setPixelShaderConstant("mLightsTex", &lights_tex, 1);
+            services->setPixelShaderConstant("mLightsIDsTex", &lights_ids_tex, 1);
+
+            auto pos = lights[current_rendered_light]->getPosition();
             services->setVertexShaderConstant("mLightPos", reinterpret_cast<f32*>(&pos), 3);
         }
         else if ((s32)mat->MaterialType == depth_sort_mat)
@@ -429,12 +449,15 @@ public:
             services->setPixelShaderConstant("mDepthTex", &depth_tex, 1);
             services->setPixelShaderConstant("mScreenSize", reinterpret_cast<f32*>(&wnd_size), 2);
 
-            video::SColorf lcolor = lights[0]->getColor();
-            lcolor.r *= lights[0]->getIntensity();
-            lcolor.g *= lights[0]->getIntensity();
-            lcolor.b *= lights[0]->getIntensity();
+            video::SColorf lcolor = lights[current_rendered_light]->getColor();
+            lcolor.r *= lights[current_rendered_light]->getIntensity();
+            lcolor.g *= lights[current_rendered_light]->getIntensity();
+            lcolor.b *= lights[current_rendered_light]->getIntensity();
 
             services->setPixelShaderConstant("mLightColor", reinterpret_cast<f32*>(&lcolor), 4);
+
+            s32 biased_light_id = current_rendered_light+1;
+            services->setPixelShaderConstant("mLightID", &biased_light_id, 1);
         }
     }
 };
@@ -459,14 +482,13 @@ bool compileShaders(video::IShaderConstantSetCallBack* callback=nullptr)
     depth_sort_mat = gpu->addHighLevelShaderMaterialFromFiles(project_path + "/lighting.vert", "main", video::EVST_VS_1_1,
         project_path + "/depth_sort.frag", "main", video::EPST_PS_1_1, callback, video::EMT_SOLID, 0);
 
-    depth_write_mat = gpu->addHighLevelShaderMaterialFromFiles(project_path + "/lighting.vert", "main", video::EVST_VS_1_1,
-        project_path + "/depth_write.frag", "main", video::EPST_PS_1_1, callback, video::EMT_SOLID, 0);
-
-    return lighting_mat != 0 && blend_mat != 0 && shadow_mat != 0 && rays_mat != 0 && depth_sort_mat != 0 && depth_write_mat != 0;
+    return lighting_mat != 0 && blend_mat != 0 && shadow_mat != 0 && rays_mat != 0 && depth_sort_mat != 0;
 }
 
-void drawCubeLight(shared_ptr<PointLight> pl, video::ITexture* depth_t)
+void drawCubeLight(shared_ptr<PointLight> pl, video::ITexture* depth_t, bool solid)
 {
+    // light_id starts from 0 !
+
     video::IVideoDriver* vdrv = device->getVideoDriver();
 
     core::vector3df normal(1.0f, 0.0f, 0.0f);
@@ -496,7 +518,7 @@ void drawCubeLight(shared_ptr<PointLight> pl, video::ITexture* depth_t)
 
     video::SMaterial def_mat;
     def_mat.Lighting = false;
-    def_mat.MaterialType = (video::E_MATERIAL_TYPE)depth_sort_mat;
+    def_mat.MaterialType = solid ?  video::EMT_SOLID : (video::E_MATERIAL_TYPE)depth_sort_mat;
     def_mat.setFlag(video::EMF_BILINEAR_FILTER, false);
     def_mat.setTexture(0, depth_t);
     vdrv->setMaterial(def_mat);
@@ -509,8 +531,7 @@ scene::IMeshSceneNode* addNode(
         const std::vector<PBRMaterial>& pbrs,
         io::path mesh_p,
         const std::vector<io::path>& texs_paths,
-        std::vector<bool> use_normalmap,
-        video::ITexture* shadow_map)
+        std::vector<bool> use_normalmap)
 {
     scene::ISceneManager* smgr = device->getSceneManager();
     video::IVideoDriver* vdrv = smgr->getVideoDriver();
@@ -583,7 +604,8 @@ int main()
     // Add two point lights
     core::aabbox3df light_box(-0.25f, -0.25f, -0.25f, 0.25f, 0.25f, 0.25f);
     PointLight::addPointLight(smgr, core::vector3df(7.0f, 2.5f, 5.0f), video::SColorf(1.0, 1.0, 1.0, 1.0), 1.0f, light_box);
-    PointLight::addPointLight(smgr, core::vector3df(-5.0f, 4.0f, 7.0f), video::SColorf(1.0, 0.0, 0.0, 1.0), 1.0f, light_box);
+    PointLight::addPointLight(smgr, core::vector3df(5.0f, 1.5f, 9.0f), video::SColorf(1.0, 1.0, 1.0, 1.0), 1.0f, light_box);
+    PointLight::addPointLight(smgr, core::vector3df(-8.0f, 7.0f, 7.0f), video::SColorf(1.0, 1.0, 1.0, 1.0), 1.0f, light_box);
 
 
     // Add the table node with two "lighting_mat" materials
@@ -592,8 +614,7 @@ int main()
         {PBRMaterial(1.0f, 1.0f, 0.3f), PBRMaterial(0.2f, 1.0f, 0.7f), PBRMaterial(1.0f, 0.5f, 0.3f)},
         "room.b3d",
         {"wood.png", "multidecor_jungle_linoleum.png", "basic_materials_concrete_block.png"},
-        {true, true, true},
-        lights[0]->getShadowTexture()
+        {true, true, true}
     );
 
     auto table = addNode(
@@ -601,8 +622,7 @@ int main()
         {PBRMaterial(0.05f, 1.0f, 0.2f), PBRMaterial(1.0f, 1.0f, 0.3f)},
         "multidecor_round_metallic_table.b3d",
         {"metal.png", "wood.png"},
-        {true, true},
-        lights[0]->getShadowTexture()
+        {true, true}
     );
 
     auto chair = addNode(
@@ -610,8 +630,7 @@ int main()
         {PBRMaterial(1.0f, 1.0f, 0.3f)},
         "chairblend.b3d",
         {"wood.png"},
-        {true},
-        lights[0]->getShadowTexture()
+        {true}
     );
 
     auto vase = addNode(
@@ -619,8 +638,7 @@ int main()
         {PBRMaterial(0.1f, 1.0f, 0.1f)},
         "cup.b3d",
         {"glass.png"},
-        {false},
-        lights[0]->getShadowTexture()
+        {false}
     );
 
     auto plate = addNode(
@@ -628,8 +646,7 @@ int main()
         {PBRMaterial(0.7f, 1.0f, 0.4f), PBRMaterial(0.05f, 1.0f, 0.2f), PBRMaterial(1.0f, 1.0f, 0.3f)},
         "plate_with_knife_and_fork.b3d",
         {"multidecor_porcelain_material.png", "metal.png", "wood.png"},
-        {true, true, true},
-        lights[0]->getShadowTexture()
+        {true, true, true}
     );
 
     auto wardrobe = addNode(
@@ -644,8 +661,7 @@ int main()
         },
         "wardrobe.b3d",
         {"multidecor_jungle_wood.png", "metal.png", "multidecor_jungle_wood.png", "glass.png", "metal.png", "multidecor_jungle_wood.png"},
-        {true, true, true, false, true, true},
-        lights[0]->getShadowTexture()
+        {true, true, true, false, true, true}
     );
 
     auto painting = addNode(
@@ -653,8 +669,15 @@ int main()
         {PBRMaterial(0.3f, 1.0f, 0.4f), PBRMaterial(0.5f, 0.8f, 0.5f)},
         "painting.b3d",
         {"metal.png", "multidecor_image_tropic.png"},
-        {true, true},
-        lights[0]->getShadowTexture()
+        {true, true}
+    );
+
+    auto armchair = addNode(
+        core::vector3df(3.0f, 0.0f, 6.0f),
+        {PBRMaterial(1.0f, 1.0f, 0.3f), PBRMaterial(1.0f, 0.5f, 0.4f), PBRMaterial(1.0f, 0.5f, 0.4f)},
+        "armchair.b3d",
+        {"wood.png", "multidecor_wool_material.png", "multidecor_wool_material.png"},
+        {true, true, true}
     );
 
 
@@ -681,7 +704,6 @@ int main()
     base_texs.push_back(base_depth_t);
 
     video::ITexture* lights_t = vdrv->addRenderTargetTexture(wnd_size, "LightsRT", video::ECF_A16B16G16R16F);
-    video::ITexture* rays_t = vdrv->addRenderTargetTexture(wnd_size, "RaysRT", video::ECF_A16B16G16R16F);
     video::ITexture* depth_t = vdrv->addRenderTargetTexture(wnd_size, "DepthRT", video::ECF_D16);
 
 
@@ -689,7 +711,9 @@ int main()
     ScreenQuad base_quad(vdrv);
 
     base_quad.mat.setTexture(0, base_t);
-    base_quad.mat.setTexture(1, rays_t);
+
+    for (u16 i = 0; i < lights_count; i++)
+        base_quad.mat.setTexture(i+1, lights[i]->getRaysTexture());
 
     f32 passed_dist = 0.0f;
     f32 max_dist = 7.0f;
@@ -755,7 +779,7 @@ int main()
             mat2.FrontfaceCulling = !mat2.FrontfaceCulling;*/
 
 
-            // Render point shadows into the cube shadowmap (currently they are cast only from first light source in the lights array
+            // Render point shadows into the cube shadowmap. It will render only if the light position is changed from last frame.
 
             set_material_for_all((video::E_MATERIAL_TYPE)shadow_mat);
             skybox->setVisible(false);
@@ -793,24 +817,34 @@ int main()
 
             smgr->drawAll();
 
+            //for (u16 i = 0; i < lights_count; i++)
+             //   drawCubeLight(lights[i], nullptr, true);
+
             // Render all glowing nodes culled by other nodes or each other into the lights texture
 
-            rt->setTexture(lights_t, depth_t);
-            vdrv->setRenderTargetEx(rt, video::ECBF_ALL);
-
-            for (u16 i = 0; i < lights_count; i++)
-                drawCubeLight(lights[i], base_depth_t);
-
-            // Render rays for first light source in the lights array
-
-            rt->setTexture(rays_t, depth_t);
-            vdrv->setRenderTargetEx(rt, video::ECBF_ALL);
             bloom_quad.mat.setTexture(0, lights_t);
             bloom_quad.mat.MaterialType = (video::E_MATERIAL_TYPE)rays_mat;
-            bloom_quad.Render();
+
+            for (u16 i = 0; i < lights_count; i++)
+            {
+                current_rendered_light = (s32)i;
+                rt->setTexture(lights_t, depth_t);
+                vdrv->setRenderTargetEx(rt, video::ECBF_ALL);
+
+                drawCubeLight(lights[i], base_depth_t, false);
+
+                //rt->setTexture(base_texs[0], depth_t);
+                //vdrv->draw2DImage(lights_t, core::recti(0, 0, wnd_size.Width, wnd_size.Height), core::recti(0, 0, wnd_size.Width, wnd_size.Height));
+
+                rt->setTexture(lights[i]->getRaysTexture(), depth_t);
+                vdrv->setRenderTargetEx(rt, video::ECBF_ALL);
+                bloom_quad.Render();
+            }
+
+            current_rendered_light = -1;
 
             vdrv->setRenderTargetEx(0, video::ECBF_NONE);
-             //vdrv->draw2DImage(base_depth_t, core::recti(0, 0, wnd_size.Width, wnd_size.Height), core::recti(0, 0, wnd_size.Width, wnd_size.Height));
+             //vdrv->draw2DImage(lights[1]->getRaysTexture(), core::recti(0, 0, wnd_size.Width, wnd_size.Height), core::recti(0, 0, wnd_size.Width, wnd_size.Height));
             //vdrv->draw2DImage(light_texs[0], core::recti(0, 0, wnd_size.Width, wnd_size.Height), core::recti(0, 0, wnd_size.Width, wnd_size.Height));
 
             base_quad.Render();

@@ -13,6 +13,7 @@ void main(void)
     float depth = texture2D(mDepthTex, depthTexCoords).r;
 
     vec3 color = vec3(0.0);
+    int light_id = 0;
 
     if (gl_FragCoord.z < depth || depth == 0.0)
         color = vec3(mLightColor);
