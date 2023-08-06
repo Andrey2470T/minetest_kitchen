@@ -4,11 +4,22 @@
 
 uniform sampler2D mBaseTex;
 uniform sampler2D mNormalTex;
-uniform samplerCube mDepthTex;
+uniform samplerCube mDepthTex1;
+uniform samplerCube mDepthTex2;
+uniform samplerCube mDepthTex3;
+uniform samplerCube mDepthTex4;
+uniform samplerCube mDepthTex5;
+uniform samplerCube mDepthTex6;
+uniform samplerCube mDepthTex7;
+uniform samplerCube mDepthTex8;
+uniform samplerCube mDepthTex9;
+uniform samplerCube mDepthTex10;
 
 uniform vec3 mViewPos;
 uniform int mLightsCount;
 uniform float mFarPlane;
+uniform float mNear;
+uniform float mFar;
 uniform vec3 mLightsPositions[MAX_LIGHTS_COUNT];
 uniform vec4 mLightsColors[MAX_LIGHTS_COUNT];
 //uniform float mLightsIntensities[MAX_LIGHTS_COUNT];
@@ -127,25 +138,102 @@ vec3 transMapNormalFromTangentToWorldSpace(vec3 pos, vec3 normal, vec2 texCoords
 
 float fragInShadow(vec3 pos, vec3 normal)
 {
-    float shadow = 0.0;
-    vec3 dir = mLightsPositions[0] - pos;
-    float bias = max(0.1 * (1.0 - dot(normalize(dir), normal)), 0.1);
+    float min_shadow = 1.0;
     float offset = 0.05;
     int samples = 20;
 
-    float currentDepth = length(dir);
-
-    for (int i = 0; i < samples; i++)
+    for (int i = 0; i < mLightsCount; i++)
     {
-        float closestDepth = textureCube(mDepthTex, dir + sampleOffsetDirections[i] * offset).r;
-        closestDepth *= mFarPlane;
+        float shadow = 0.0;
 
-        shadow += (currentDepth - bias > closestDepth ? 1.0 : 0.0);
+        vec3 dir = mLightsPositions[i] - pos;
+        float bias = max(0.1 * (1.0 - dot(normalize(dir), normal)), 0.1);
+
+        float currentDepth = length(dir);
+
+        for (int k = 0; k < samples; k++)
+        {
+            float closestDepth = 0.0;
+
+            if (i == 0)
+                closestDepth = textureCube(mDepthTex1, dir + sampleOffsetDirections[k] * offset).r;
+            else if (i == 1)
+                closestDepth = textureCube(mDepthTex2, dir + sampleOffsetDirections[k] * offset).r;
+            else if (i == 2)
+                closestDepth = textureCube(mDepthTex3, dir + sampleOffsetDirections[k] * offset).r;
+            else if (i == 3)
+                closestDepth = textureCube(mDepthTex4, dir + sampleOffsetDirections[k] * offset).r;
+            else if (i == 4)
+                closestDepth = textureCube(mDepthTex5, dir + sampleOffsetDirections[k] * offset).r;
+            else if (i == 5)
+                closestDepth = textureCube(mDepthTex6, dir + sampleOffsetDirections[k] * offset).r;
+            else if (i == 6)
+                closestDepth = textureCube(mDepthTex7, dir + sampleOffsetDirections[k] * offset).r;
+            else if (i == 7)
+                closestDepth = textureCube(mDepthTex8, dir + sampleOffsetDirections[k] * offset).r;
+            else if (i == 8)
+                closestDepth = textureCube(mDepthTex9, dir + sampleOffsetDirections[k] * offset).r;
+            else if (i == 9)
+                closestDepth = textureCube(mDepthTex10, dir + sampleOffsetDirections[k] * offset).r;
+            closestDepth *= mFarPlane;
+
+            shadow += (currentDepth - bias > closestDepth ? 1.0 : 0.0);
+        }
+
+        shadow /= float(samples);
+
+        min_shadow = min(min_shadow, shadow);
     }
 
-    shadow /= float(samples);
+    return min_shadow;
+    //float shadow = 0.0;
+    //vec3 dir = mLightsPositions[0] - pos;
+    //float bias = max(0.1 * (1.0 - dot(normalize(dir), normal)), 0.1);
+    /*float offset = 0.05;
+    int samples = 20;
 
-    return shadow;
+    for (int j = 0; j < mLightsCount; j++)
+    {
+        vec3 dir = mLightsPositions[j] - pos;
+        float bias = max(0.1 * (1.0 - dot(normalize(dir), normal)), 0.1);
+
+        float currentDepth = length(dir);
+
+        for (int i = 0; i < samples; i++)
+        {
+            float closestDepth = 0.0f;
+
+            if (j == 0)
+                closestDepth = textureCube(mDepthTex1, dir + sampleOffsetDirections[i] * offset).r;
+            else if (j == 1)
+            {
+                closestDepth = textureCube(mDepthTex2, dir + sampleOffsetDirections[i] * offset).r;
+            }
+            else if (j == 2)
+                closestDepth = textureCube(mDepthTex[2], dir + sampleOffsetDirections[i] * offset).r;
+            else if (j == 3)
+                closestDepth = textureCube(mDepthTex[3], dir + sampleOffsetDirections[i] * offset).r;
+            else if (j == 4)
+                closestDepth = textureCube(mDepthTex[4], dir + sampleOffsetDirections[i] * offset).r;
+            else if (j == 5)
+                closestDepth = textureCube(mDepthTex[5], dir + sampleOffsetDirections[i] * offset).r;
+            else if (j == 6)
+                closestDepth = textureCube(mDepthTex[6], dir + sampleOffsetDirections[i] * offset).r;
+            else if (j == 7)
+                closestDepth = textureCube(mDepthTex[7], dir + sampleOffsetDirections[i] * offset).r;
+            else if (j == 8)
+                closestDepth = textureCube(mDepthTex[8], dir + sampleOffsetDirections[i] * offset).r;
+            else if (j == 9)
+                closestDepth = textureCube(mDepthTex[9], dir + sampleOffsetDirections[i] * offset).r;
+            closestDepth *= mFarPlane;
+
+            shadow += (currentDepth - bias > closestDepth ? 1.0 : 0.0);
+        }
+    }
+
+    shadow /= float(samples*mLightsCount);
+
+    return shadow;*/
     /*vec3 dir = mLightsPositions[0] - pos;
     float closestDist = textureCube(mDepthTex, dir).r;
     closestDist *= mFarPlane;
@@ -158,6 +246,7 @@ float fragInShadow(vec3 pos, vec3 normal)
     //return closestDist;
 }
 
+
 void main(void)
 {
     vec3 viewDir = normalize(mViewPos - vPos);
@@ -167,7 +256,13 @@ void main(void)
 
     vec3 r = vec3(0.0);
 
-    vec3 mapNormal = transMapNormalFromTangentToWorldSpace(vPos, vNormal, gl_TexCoord[0].st);
+    vec3 mapNormal;
+
+    vec3 check_normal = texture2D(mNormalTex, gl_TexCoord[0].st).rgb;
+    bool isNMDisabled = check_normal.r == 0.0 && check_normal.g == 0.0 && check_normal.b == 0.0;
+
+    if (!isNMDisabled)
+        mapNormal = transMapNormalFromTangentToWorldSpace(vPos, vNormal, gl_TexCoord[0].st);
 
     for (int i = 0; i < mLightsCount; i++)
     {
@@ -182,7 +277,7 @@ void main(void)
         vertices[7] = vec3(mLightsBBoxMinEdges[i].x, mLightsBBoxMaxEdges[i].y, mLightsBBoxMaxEdges[i].z);
 
         for (int k = 0; k < 8; k++)
-            r += calcReflectCapability(vNormal, mLightsPositions[i]+vertices[k], viewDir, mRoughness, f0, vec3(mLightsColors[i]));
+            r += calcReflectCapability(isNMDisabled ? vNormal : mapNormal, mLightsPositions[i]+vertices[k], viewDir, mRoughness, f0, vec3(mLightsColors[i]));
     }
 
     vec3 ambient = vec3(0.1) * vec3(baseColor) * mAO;
@@ -194,5 +289,6 @@ void main(void)
     color /= color + vec3(1.0);
     color = pow(color, vec3(1.0/2.2));
 
-    gl_FragColor = vec4(color, baseColor.a);
+    gl_FragData[0] = vec4(color, baseColor.a);
+    gl_FragData[1] = vec4(gl_FragCoord.z, 0.0, 0.0, 1.0);
 }
