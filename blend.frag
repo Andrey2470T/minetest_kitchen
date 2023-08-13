@@ -30,8 +30,6 @@ void main(void)
 
     vec4 color = base_color + rays_color1 + rays_color2 + rays_color3 + rays_color4 + rays_color5 +
             rays_color6 + rays_color7 + rays_color8 + rays_color9 + rays_color10;
-    //vec3 res = vec3(1.0) - exp(-color);
-    //res = pow(res, vec3(1.0/2.2));
 
     gl_FragColor = vec4(vec3(color), 1.0);
 }

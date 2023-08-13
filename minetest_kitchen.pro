@@ -6,7 +6,11 @@ CONFIG -= qt
 TARGET = minetest_kitchen
 
 SOURCES += \
-        main.cpp
+        functions.cpp \
+        globals.cpp \
+        main.cpp \
+        point_light.cpp \
+        screen_quad.cpp
 
 LIBS += -L/home/andrey/irrlicht-1.9/lib/Linux/ -lIrrlicht \
     -L/usr/X11R6/lib$(LIBSELECT) -lXxf86vm -lXext
@@ -25,3 +29,9 @@ DISTFILES += \
     rays.frag \
     rays.vert \
     shadow_write.frag
+
+HEADERS += \
+    functions.h \
+    globals.h \
+    point_light.h \
+    screen_quad.h
