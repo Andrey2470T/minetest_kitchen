@@ -6,11 +6,11 @@ CONFIG -= qt
 TARGET = minetest_kitchen
 
 SOURCES += \
-        functions.cpp \
-        globals.cpp \
-        main.cpp \
-        point_light.cpp \
-        screen_quad.cpp
+        src/functions.cpp \
+        src/globals.cpp \
+        src/main.cpp \
+        src/point_light.cpp \
+        src/screen_quad.cpp
 
 LIBS += -L/home/andrey/irrlicht-1.9/lib/Linux/ -lIrrlicht \
     -L/usr/X11R6/lib$(LIBSELECT) -lXxf86vm -lXext
@@ -18,20 +18,23 @@ LIBS += -L/home/andrey/irrlicht-1.9/lib/Linux/ -lIrrlicht \
 INCLUDEPATH += /home/andrey/irrlicht-1.9/include/
 
 DISTFILES += \
-    blend.frag \
-    blur.vert \
-    blur_h.frag \
-    blur_v.frag \
-    depth_sort.frag \
-    depth_write.frag \
-    lighting.frag \
-    lighting.vert \
-    rays.frag \
-    rays.vert \
+    shaders/blend.frag \
+    shaders/blur.vert \
+    shaders/blur_h.frag \
+    shaders/blur_v.frag \
+    shaders/depth_sort.frag \
+    shaders/depth_write.frag \
+    shaders/lighting.frag \
+    shaders/lighting.vert \
+    shaders/rays.frag \
+    shaders/rays.vert \
+    shaders/shadow_write.frag \
+    shaders/shadow_write.vert \
     shadow_write.frag
 
 HEADERS += \
-    functions.h \
-    globals.h \
-    point_light.h \
-    screen_quad.h
+    src/constant_setter.h \
+    src/functions.h \
+    src/globals.h \
+    src/point_light.h \
+    src/screen_quad.h

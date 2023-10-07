@@ -1,7 +1,9 @@
 #version 130
 
 #define MAX_LIGHTS_COUNT 10
-uniform sampler2D mTex;
+uniform sampler2D mBaseTex;
+uniform sampler2D mLightTex;
+uniform vec4 mLightColor;
 //uniform vec2 mLightScreenPos;
 
 varying vec2 vTexCoord;
@@ -17,14 +19,22 @@ void main(void)
     vec2 uv = vTexCoord;
     vec2 dirToCentre = (vLightPos - uv) / float(samples);
 
-    vec3 color = texture2D(mTex, uv).rgb;
+    vec3 color = texture2D(mLightTex, uv).rgb;
 
     for (int i = 0; i < samples; i++)
     {
-        color += texture2D(mTex, uv).rgb * intensity;
+        color += texture2D(mLightTex, uv).rgb * intensity;
         intensity *= decay;
         uv += dirToCentre;
     }
+
+    vec3 base_color = texture2D(mBaseTex, vTexCoord).rgb;
+
+    float luminance = dot(color*255.0, vec3(0.3, 0.59, 0.11));
+    float luminance_orig = dot(vec3(mLightColor)*255.0, vec3(0.3, 0.59, 0.11));
+
+    float ratio = luminance / luminance_orig;
+    color = (1.0-ratio)*base_color + ratio*color;
 
     gl_FragColor = vec4(color, 1.0);
 }

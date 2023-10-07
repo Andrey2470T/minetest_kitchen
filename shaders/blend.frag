@@ -28,8 +28,10 @@ void main(void)
     vec4 rays_color9 = texture2D(mRaysTex9, vTexCoord);
     vec4 rays_color10 = texture2D(mRaysTex10, vTexCoord);
 
-    vec4 color = base_color + rays_color1 + rays_color2 + rays_color3 + rays_color4 + rays_color5 +
-            rays_color6 + rays_color7 + rays_color8 + rays_color9 + rays_color10;
+    float luminance1 = dot(rays_color1.rgb, vec3(0.3, 0.59, 0.11));
+    float luminance2 = dot(rays_color2.rgb, vec3(0.3, 0.59, 0.11));
+    float luminance3 = dot(rays_color3.rgb, vec3(0.3, 0.59, 0.11));
+    vec4 color = (1.0-luminance2)*base_color + luminance2*rays_color2;
 
     gl_FragColor = vec4(vec3(color), 1.0);
 }

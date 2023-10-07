@@ -7,7 +7,7 @@ s32 shadow_mat = -1;
 s32 rays_mat = -1;
 s32 depth_sort_mat = -1;
 
-io::path project_path = "/home/andrey/minetest_kitchen";
+io::path project_path = "";
 core::dimension2du wnd_size = core::dimension2du(1024, 680);
 
 f32 far_plane = 30.0f;

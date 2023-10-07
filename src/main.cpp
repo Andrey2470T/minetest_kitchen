@@ -181,13 +181,17 @@ public:
         }
         else if ((s32)mat->MaterialType == rays_mat)
         {
-            s32 lights_tex = 0;
-            s32 lights_ids_tex = 1;
+            s32 base_tex = 0;
+            s32 light_tex = 1;
 
-            services->setPixelShaderConstant("mLightsTex", &lights_tex, 1);
-            services->setPixelShaderConstant("mLightsIDsTex", &lights_ids_tex, 1);
+            services->setPixelShaderConstant("mBaseTex", &base_tex, 1);
+            services->setPixelShaderConstant("mLightTex", &light_tex, 1);
 
-            auto pos = lights[current_rendered_light]->getPosition();
+            auto light = lights[current_rendered_light];
+            auto pos = light->getPosition();
+            auto color = light->getColor();
+
+            services->setPixelShaderConstant("mLightColor", reinterpret_cast<f32*>(&color), 4);
             services->setVertexShaderConstant("mLightPos", reinterpret_cast<f32*>(&pos), 3);
         }
         else if ((s32)mat->MaterialType == depth_sort_mat)
@@ -220,6 +224,12 @@ int main()
     device->setEventReceiver(&receiver);
 
     MyShaderConstantCallback callback;
+
+    project_path = device->getFileSystem()->getAbsolutePath("minetest_kitchen");
+    project_path = project_path.subString(0, project_path.findLast('/'));
+    project_path = project_path.subString(0, project_path.findLast('/')) + "/minetest_kitchen";
+
+    cout << "project_path: " << project_path.c_str() << endl;
 
     // Compile all necessary shaders
     bool success = compileShaders(&callback);
@@ -313,7 +323,7 @@ int main()
     // Add skybox and main camera
     vdrv->setTextureCreationFlag(video::ETCF_CREATE_MIP_MAPS, false);
 
-    video::ITexture* tiles = vdrv->getTexture(project_path + "/junglewood.png");
+    video::ITexture* tiles = vdrv->getTexture(project_path + "/media/junglewood.png");
     scene::ISceneNode* skybox = smgr->addSkyBoxSceneNode(tiles, tiles, tiles, tiles, tiles, tiles);
     skybox->setMaterialFlag(video::EMF_BILINEAR_FILTER, false);
 
@@ -335,11 +345,14 @@ int main()
     video::ITexture* lights_t = vdrv->addRenderTargetTexture(wnd_size, "LightsRT", video::ECF_A16B16G16R16F);
     video::ITexture* depth_t = vdrv->addRenderTargetTexture(wnd_size, "DepthRT", video::ECF_D16);
 
+    video::ITexture* final_t = vdrv->addRenderTargetTexture(wnd_size, "FinalRT", video::ECF_A16B16G16R16F);
+
 
     ScreenQuad bloom_quad(vdrv);
     ScreenQuad base_quad(vdrv);
 
-    base_quad.mat.setTexture(0, base_t);
+    //bloom_quad.mat.setTexture(0, base_t);
+    bloom_quad.mat.setTexture(1, lights_t);
 
     for (u16 i = 0; i < lights_count; i++)
         base_quad.mat.setTexture(i+1, lights[i]->getRaysTexture());
@@ -446,37 +459,35 @@ int main()
 
             smgr->drawAll();
 
-            //for (u16 i = 0; i < lights_count; i++)
-             //   drawCubeLight(lights[i], nullptr, true);
 
-            // Render all glowing nodes culled by other nodes or each other into the lights texture
-
-            bloom_quad.mat.setTexture(0, lights_t);
             bloom_quad.mat.MaterialType = (video::E_MATERIAL_TYPE)rays_mat;
+
+            bool render_to_final_t = true;
 
             for (u16 i = 0; i < lights_count; i++)
             {
+                bloom_quad.mat.setTexture(0, render_to_final_t ? base_t : final_t);
+
                 current_rendered_light = (s32)i;
                 rt->setTexture(lights_t, depth_t);
                 vdrv->setRenderTargetEx(rt, video::ECBF_ALL);
 
                 drawCubeLight(lights[i], base_depth_t, false);
 
-                //rt->setTexture(base_texs[0], depth_t);
-                //vdrv->draw2DImage(lights_t, core::recti(0, 0, wnd_size.Width, wnd_size.Height), core::recti(0, 0, wnd_size.Width, wnd_size.Height));
+                rt->setTexture(render_to_final_t ? final_t : base_t, depth_t);
 
-                rt->setTexture(lights[i]->getRaysTexture(), depth_t);
                 vdrv->setRenderTargetEx(rt, video::ECBF_ALL);
                 bloom_quad.Render();
+
+                render_to_final_t = !render_to_final_t;
             }
 
             current_rendered_light = -1;
 
             vdrv->setRenderTargetEx(0, video::ECBF_NONE);
-             //vdrv->draw2DImage(lights[1]->getRaysTexture(), core::recti(0, 0, wnd_size.Width, wnd_size.Height), core::recti(0, 0, wnd_size.Width, wnd_size.Height));
-            //vdrv->draw2DImage(light_texs[0], core::recti(0, 0, wnd_size.Width, wnd_size.Height), core::recti(0, 0, wnd_size.Width, wnd_size.Height));
+            vdrv->draw2DImage(lights_count % 2 == 0 ? base_t : final_t, core::recti(0, 0, wnd_size.Width, wnd_size.Height), core::recti(0, 0, wnd_size.Width, wnd_size.Height));
 
-            base_quad.Render();
+            //base_quad.Render();
 
             vdrv->endScene();
         }

@@ -41,20 +41,22 @@ bool compileShaders(video::IShaderConstantSetCallBack* callback)
     video::IVideoDriver* vdrv = device->getVideoDriver();
     video::IGPUProgrammingServices* gpu = vdrv->getGPUProgrammingServices();
 
-    lighting_mat = gpu->addHighLevelShaderMaterialFromFiles(project_path + "/lighting.vert", "main", video::EVST_VS_1_1,
-        project_path + "/lighting.frag", "main", video::EPST_PS_1_1, callback, video::EMT_TRANSPARENT_ALPHA_CHANNEL, 0);
+    io::path shaders_path = project_path + "/shaders";
 
-    blend_mat = gpu->addHighLevelShaderMaterialFromFiles(project_path + "/blur.vert", "main", video::EVST_VS_1_1,
-        project_path + "/blend.frag", "main", video::EPST_PS_1_1, callback, video::EMT_SOLID, 0);
+    lighting_mat = gpu->addHighLevelShaderMaterialFromFiles(shaders_path + "/lighting.vert", "main", video::EVST_VS_1_1,
+        shaders_path + "/lighting.frag", "main", video::EPST_PS_1_1, callback, video::EMT_TRANSPARENT_ALPHA_CHANNEL, 0);
 
-    shadow_mat = gpu->addHighLevelShaderMaterialFromFiles(project_path + "/lighting.vert", "main", video::EVST_VS_1_1,
-        project_path + "/shadow_write.frag", "main", video::EPST_PS_1_1, callback, video::EMT_SOLID, 0);
+    blend_mat = gpu->addHighLevelShaderMaterialFromFiles(shaders_path + "/blur.vert", "main", video::EVST_VS_1_1,
+        shaders_path + "/blend.frag", "main", video::EPST_PS_1_1, callback, video::EMT_SOLID, 0);
 
-    rays_mat = gpu->addHighLevelShaderMaterialFromFiles(project_path + "/rays.vert", "main", video::EVST_VS_1_1,
-        project_path + "/rays.frag", "main", video::EPST_PS_1_1, callback, video::EMT_SOLID, 0);
+    shadow_mat = gpu->addHighLevelShaderMaterialFromFiles(shaders_path + "/lighting.vert", "main", video::EVST_VS_1_1,
+        shaders_path + "/shadow_write.frag", "main", video::EPST_PS_1_1, callback, video::EMT_SOLID, 0);
 
-    depth_sort_mat = gpu->addHighLevelShaderMaterialFromFiles(project_path + "/lighting.vert", "main", video::EVST_VS_1_1,
-        project_path + "/depth_sort.frag", "main", video::EPST_PS_1_1, callback, video::EMT_SOLID, 0);
+    rays_mat = gpu->addHighLevelShaderMaterialFromFiles(shaders_path + "/rays.vert", "main", video::EVST_VS_1_1,
+        shaders_path + "/rays.frag", "main", video::EPST_PS_1_1, callback, video::EMT_SOLID, 0);
+
+    depth_sort_mat = gpu->addHighLevelShaderMaterialFromFiles(shaders_path + "/lighting.vert", "main", video::EVST_VS_1_1,
+        shaders_path + "/depth_sort.frag", "main", video::EPST_PS_1_1, callback, video::EMT_SOLID, 0);
 
     return lighting_mat != 0 && blend_mat != 0 && shadow_mat != 0 && rays_mat != 0 && depth_sort_mat != 0;
 }
@@ -110,7 +112,9 @@ scene::IMeshSceneNode* addNode(
     scene::ISceneManager* smgr = device->getSceneManager();
     video::IVideoDriver* vdrv = smgr->getVideoDriver();
 
-    scene::IMesh* n_mesh = smgr->getMesh(project_path + "/" + mesh_p);
+    io::path media_path = project_path + "/media/";
+
+    scene::IMesh* n_mesh = smgr->getMesh(media_path + mesh_p);
     n_mesh = smgr->getMeshManipulator()->createMeshWithTangents(n_mesh);
 
     scene::IMeshSceneNode* n = smgr->addMeshSceneNode(n_mesh);
@@ -135,8 +139,8 @@ scene::IMeshSceneNode* addNode(
 
         n_mat_copy.MaterialTypeParam = pack_PBR_properties(pbrs[i]);
 
-        io::path t_path = io::path("/") + texs_paths[i];
-        n_mat_copy.setTexture(0, vdrv->getTexture(project_path + t_path));
+        io::path t_path = texs_paths[i];
+        n_mat_copy.setTexture(0, vdrv->getTexture(media_path + t_path));
 
         if (use_normalmap[i])
         {
@@ -145,7 +149,7 @@ scene::IMeshSceneNode* addNode(
             io::path ext;
             core::cutFilenameExtension(filename, t_path);
             core::getFileNameExtension(ext, t_path);
-            video::ITexture* nm = vdrv->getTexture(project_path + filename + "_nm" + ext);
+            video::ITexture* nm = vdrv->getTexture(media_path + filename + "_nm" + ext);
             vdrv->makeNormalMapTexture(nm, pbrs[i].Roughness);
             n_mat_copy.setTexture(1, nm);
         }
